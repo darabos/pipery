@@ -1,8 +1,28 @@
 const glsl = x => x;
+const glslCanvas = document.getElementById('glslCanvas');
+glslCanvas.onclick = () => {
+  console.log('clicked');
+};
+const gl = glslCanvas.getContext('webgl2');
+const W = 256;
+const H = 256;
+const data = new Float32Array(W * H * 4); // RGBA per pixel
+for (let i = 0; i < data.length; i += 4) {
+    data[i + 0] = Math.random(); // R
+    data[i + 1] = Math.random(); // G
+    data[i + 2] = Math.random(); // B
+    data[i + 3] = 1.0;           // A
+}
+const texture = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, texture);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, W, H, 0, gl.RGBA, gl.FLOAT, data);
 (function(source) {
   const toy = new ShaderToyLite('glslCanvas');
+  toy.addTexture(texture, 'game');
   toy.setCommon("");
-  toy.setImage({source});
+  toy.setImage({source, iChannel0: 'game'});
   toy.play();
 })(glsl`
 
@@ -154,9 +174,10 @@ vec2 map(in vec3 pos) {
   vec2 res = vec2(pos.y, 0.0);
   ivec2 cell = hexagonID(pos.xz*5.);
   vec2 center = hexagonCenFromID(cell) * 0.2;
+  float c = texture(iChannel0, vec2(cell)*0.01).r;
   pos -= vec3(center.x, 0.0, center.y);
   res = opU(res, vec2(sdCapsule(rot30(pos), vec3(0., 0.04, -0.5), vec3(0., 0.04, 0.5), 0.04), 3.5));
-  res = opU(res, vec2(sdTorus(pos+vec3(0.,0.,0.), vec2(0.2, 0.04)), 4.5));
+  res = opU(res, vec2(sdTorus(pos+vec3(0.,0.,0.), vec2(0.2-c*.1, 0.04)), 4.5+c*4.));
   // res = opU(res, vec2(sdSphere(pos+vec3(0.,0.3,0.), .5), 5.5+float(cell.x+100)));
   return res;
 }
