@@ -2,7 +2,23 @@ const glsl = x => x;
 const glslCanvas = document.getElementById('glslCanvas');
 glslCanvas.onclick = () => {
   console.log('clicked');
+  updateCell(0, 0, Math.random(), Math.random(), Math.random(), 1.0);
 };
+function updateCell(x, y, r, g, b, a) {
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  const pixel = new Float32Array([r, g, b, a]);
+  gl.texSubImage2D(
+      gl.TEXTURE_2D,    // target
+      0,                // mip level
+      x,                // x offset (in texels)
+      y,                // y offset (in texels)
+      1,                // width
+      1,                // height
+      gl.RGBA,          // format
+      gl.FLOAT,         // type
+      pixel             // data
+  );
+}
 const gl = glslCanvas.getContext('webgl2');
 const W = 256;
 const H = 256;
@@ -59,10 +75,9 @@ float sdCapsule(vec3 p, vec3 a, vec3 b, float r) {
   return length(pa - ba * h) - r;
 }
 
-// vertical
-float sdCylinder(vec3 p, vec2 h) {
-  vec2 d = abs(vec2(length(p.xz), p.y)) - h;
-  return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
+// horizontal
+float sdCylinder(vec3 p, float w) {
+  return length(p.yz) - w;
 }
 
 // arbitrary orientation
@@ -162,9 +177,9 @@ float sdTorus( vec3 p, vec2 t ) {
     return length( vec2(length(p.xz)-t.x,p.y) )-t.y;
 }
 
-vec3 rot30(in vec3 p) {
-  float c = 0.8660254;
-  float s = 0.5;
+vec3 rot(in float angle, in vec3 p) {
+  float c = cos(angle);
+  float s = sin(angle);
   mat2 r = mat2(c, -s, s, c);
   p.xz = r * p.xz;
   return p;
@@ -174,11 +189,29 @@ vec2 map(in vec3 pos) {
   vec2 res = vec2(pos.y, 0.0);
   ivec2 cell = hexagonID(pos.xz*5.);
   vec2 center = hexagonCenFromID(cell) * 0.2;
-  float c = texture(iChannel0, vec2(cell)*0.01).r;
+  vec4 data = texture(iChannel0, vec2(cell)*0.01);
+  float r = data.r + iTime*0.1;
   pos -= vec3(center.x, 0.0, center.y);
-  res = opU(res, vec2(sdCapsule(rot30(pos), vec3(0., 0.04, -0.5), vec3(0., 0.04, 0.5), 0.04), 3.5));
-  res = opU(res, vec2(sdTorus(pos+vec3(0.,0.,0.), vec2(0.2-c*.1, 0.04)), 4.5+c*4.));
-  // res = opU(res, vec2(sdSphere(pos+vec3(0.,0.3,0.), .5), 5.5+float(cell.x+100)));
+  // res = opU(res, vec2(sdCapsule(rot(r*5., pos), vec3(0., 0.04, -0.5), vec3(0., 0.04, 0.5), 0.04), 3.5));
+  if (data.g < 0.05) {
+    res = opU(res, vec2(sdCylinder(rot(r*5., pos+vec3(0.,-.05,0.)), 0.04), 5.5));
+    res = opU(res, vec2(sdCylinder(rot(r*5.+1.05, pos+vec3(0.,-.05,0.)), 0.04), 5.5));
+    res = opU(res, vec2(sdCylinder(rot(r*5.+2.1, pos+vec3(0.,-.05,0.)), 0.04), 5.5));
+  } else if (data.g < 0.15) {
+    res = opU(res, vec2(sdCylinder(rot(r*5., pos+vec3(0.,-.05,0.)), 0.04), 5.5));
+    res = opU(res, vec2(sdCylinder(rot(r*5.+1.05, pos+vec3(0.,-.05,0.)), 0.04), 5.5));
+  } else if (data.g < 0.33) {
+    res = opU(res, vec2(sdCylinder(rot(r*5., pos+vec3(0.,-.05,0.)), 0.04), 5.5));
+  } else if (data.g < 0.4) {
+    res = opU(res, vec2(sdTorus(rot(r*5., pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5));
+    res = opU(res, vec2(sdTorus(rot(r*5.+1.05, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5));
+  } else if (data.g < 0.66) {
+    res = opU(res, vec2(sdTorus(rot(r*5., pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5));
+  } else {
+    res = opU(res, vec2(sdTorus(rot(r*5., pos)+vec3(0.2,-.05,0.1155), vec2(0.1155, 0.04)), 5.5));
+  }
+  // res = opU(res, vec2(sdTorus(pos+vec3(0.,0.,0.), vec2(0.2-r*.1, 0.04)), 4.5+r*4.));
+  res = opU(res, vec2(sdSphere(pos+vec3(0.,0.45,0.), .5), 3.5));
   return res;
 }
 
