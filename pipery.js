@@ -1,4 +1,6 @@
-const glsl = x => x;
+const glsl = (strings, ...values) =>
+  values.reduce((acc, v, i) => acc + `${v}` + strings[i + 1], strings[0]);
+let currentCanvasUpdate = 0;
 const glslCanvas = document.getElementById('glslCanvas');
 glslCanvas.onclick = () => {
   console.log('clicked');
@@ -19,20 +21,67 @@ function updateCell(x, y, r, g, b, a) {
       pixel             // data
   );
 }
-const gl = glslCanvas.getContext('webgl2');
-const W = 256;
-const H = 256;
-const data = new Float32Array(W * H * 4); // RGBA per pixel
-for (let i = 0; i < data.length; i += 4) {
-    data[i + 0] = Math.random(); // R
-    data[i + 1] = Math.random(); // G
-    data[i + 2] = Math.random(); // B
-    data[i + 3] = 1.0;           // A
+const blockTypes = {
+  0b000000: 0,
+  0b000001: 1,
+  0b000011: 2,
+  0b000101: 3,
+  0b000111: 4,
+  0b001001: 5,
+  0b001011: 6,
+  0b001101: 7,
+  0b001111: 8,
+  0b010101: 9,
+  0b010111: 10,
+  0b011011: 11,
+  0b011111: 12,
+  0b111111: 13,
+};
+const sidesToTypesAndRotations = {};
+for (let s = 0; s < 64; s++) {
+  sidesToTypesAndRotations[s] = normalizeSides(s);
 }
+function normalizeSides(s) {
+  // try all rotations to find a known type
+  for (let rot = 0; rot < 6; rot++) {
+    const rs =
+      ((s >> rot) | (s << (6 - rot))) & 0b111111;
+    if (blockTypes[rs] !== undefined) {
+      return {
+        type: blockTypes[rs],
+        rotation: (6 - rot) % 6,
+      };
+      break;
+    }
+  }
+}
+const gl = glslCanvas.getContext('webgl2');
+const R = 5;
+const W = R * 4;
+const H = R * 4;
+const TYPE_MAX = 20;
+const data = new Float32Array(W * H * 4); // RGBA per pixel
+game.generateGame("hexagon", R, R);
+boardToTextureData();
+function boardToTextureData() {
+	for (const [key, poly] of game.board) {
+    const [x, y] = key.split('_').map(Number);
+		// poly.updatePipesRotationDisplay();
+    const i = (y * W + x + 1 + R * W) * 4;
+    const tnr = sidesToTypesAndRotations[poly.pipes];
+    data[i + 0] = Math.PI / 3 * tnr.rotation;
+    data[i + 1] = tnr.type / TYPE_MAX;
+    data[i + 2] = 2;
+    data[i + 3] = 1;
+  }
+}
+console.log('texture data:', data);
 const texture = gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D, texture);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, W, H, 0, gl.RGBA, gl.FLOAT, data);
 (function(source) {
   const toy = new ShaderToyLite('glslCanvas');
@@ -187,30 +236,60 @@ vec3 rot(in float angle, in vec3 p) {
 
 vec2 map(in vec3 pos) {
   vec2 res = vec2(pos.y, 0.0);
+  pos.y -= 0.1;
+  pos.x += .5;
+  pos.z += 2.;
   ivec2 cell = hexagonID(pos.xz*5.);
   vec2 center = hexagonCenFromID(cell) * 0.2;
-  vec4 data = texture(iChannel0, vec2(cell)*0.01);
-  float r = data.r + iTime*0.1;
+  vec2 uv = vec2(cell).yx;
+  // uv.x /= 2.;
+  uv.y += ${R}.;
+  vec4 data = texture(iChannel0, uv / ${W}.);
+  float ty = data.g * ${TYPE_MAX}.;
+  if (ty < 0.5) { // 000000
+    return res;
+  }
+  float r = data.r;// + iTime*0.1;
   pos -= vec3(center.x, 0.0, center.y);
   // res = opU(res, vec2(sdCapsule(rot(r*5., pos), vec3(0., 0.04, -0.5), vec3(0., 0.04, 0.5), 0.04), 3.5));
-  if (data.g < 0.05) {
-    res = opU(res, vec2(sdCylinder(rot(r*5., pos+vec3(0.,-.05,0.)), 0.04), 5.5));
-    res = opU(res, vec2(sdCylinder(rot(r*5.+1.05, pos+vec3(0.,-.05,0.)), 0.04), 5.5));
-    res = opU(res, vec2(sdCylinder(rot(r*5.+2.1, pos+vec3(0.,-.05,0.)), 0.04), 5.5));
-  } else if (data.g < 0.15) {
-    res = opU(res, vec2(sdCylinder(rot(r*5., pos+vec3(0.,-.05,0.)), 0.04), 5.5));
-    res = opU(res, vec2(sdCylinder(rot(r*5.+1.05, pos+vec3(0.,-.05,0.)), 0.04), 5.5));
-  } else if (data.g < 0.33) {
-    res = opU(res, vec2(sdCylinder(rot(r*5., pos+vec3(0.,-.05,0.)), 0.04), 5.5));
-  } else if (data.g < 0.4) {
-    res = opU(res, vec2(sdTorus(rot(r*5., pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5));
-    res = opU(res, vec2(sdTorus(rot(r*5.+1.05, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5));
-  } else if (data.g < 0.66) {
-    res = opU(res, vec2(sdTorus(rot(r*5., pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5));
-  } else {
-    res = opU(res, vec2(sdTorus(rot(r*5., pos)+vec3(0.2,-.05,0.1155), vec2(0.1155, 0.04)), 5.5));
+  vec2 straight = vec2(sdCylinder(rot(r*5., pos+vec3(0.,-.05,0.)), 0.04), 5.5);
+  vec2 straight60 = vec2(sdCylinder(rot(r*5.+1.05, pos+vec3(0.,-.05,0.)), 0.04), 5.5);
+  vec2 straight120 = vec2(sdCylinder(rot(r*5.+2.1, pos+vec3(0.,-.05,0.)), 0.04), 5.5);
+  vec2 bigbend = vec2(sdTorus(rot(r*5., pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5);
+  vec2 bigbend60 = vec2(sdTorus(rot(r*5.+1.05, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5);
+  vec2 smallbend = vec2(sdTorus(rot(r*5., pos)+vec3(0.2,-.05,0.1155), vec2(0.1155, 0.04)), 5.5);
+  if (ty < 1.5) { // 000001
+  } else if (ty < 2.5) { // 000011
+    res = opU(res, smallbend);
+  } else if (ty < 3.5) { // 000101
+    res = opU(res, bigbend);
+  } else if (ty < 4.5) { // 000111
+  } else if (ty < 5.5) { // 001001
+    res = opU(res, straight);
+  } else if (ty < 6.5) { // 001011
+    res = opU(res, straight);
+    //
+  } else if (ty < 7.5) { // 001101
+    res = opU(res, straight);
+    //
+  } else if (ty < 8.5) { // 001111
+    res = opU(res, bigbend);
+    res = opU(res, bigbend60);
+  } else if (ty < 9.5) { // 010101
+  } else if (ty < 10.5) { // 010111
+    res = opU(res, straight);
+    //
+  } else if (ty < 11.5) { // 011011
+    res = opU(res, straight);
+    res = opU(res, straight60);
+  } else if (ty < 12.5) { // 011011
+    res = opU(res, straight);
+    res = opU(res, straight60);
+  } else { // 111111
+    res = opU(res, straight);
+    res = opU(res, straight60);
+    res = opU(res, straight120);
   }
-  // res = opU(res, vec2(sdTorus(pos+vec3(0.,0.,0.), vec2(0.2-r*.1, 0.04)), 4.5+r*4.));
   res = opU(res, vec2(sdSphere(pos+vec3(0.,0.45,0.), .5), 3.5));
   return res;
 }

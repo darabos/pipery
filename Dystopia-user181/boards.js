@@ -15,7 +15,6 @@ const game = {
 	won: false,
 	makeWin() {
 		game.won = true;
-		document.getElementById("win-text").style.display = "block";
 		for (const [_, poly] of game.board) {
 			poly.locked = true;
 			poly.lastCanvasUpdate = currentCanvasUpdate;
@@ -93,7 +92,6 @@ const game = {
 	},
 	generateFromBoard() {
 		game.won = false;
-		document.getElementById("win-text").style.display = "none";
 		const NODE_PROBABILITY = 0.07;
 		const EDGE_PROBABILITY = 0.11;
 		const queue = new Queue();
@@ -110,7 +108,7 @@ const game = {
 				let validCons = top.connections.map((other, idx) => [other, idx])
 					.filter(con => con[0] && con[0].dsu_find() !== top.dsu_find());
 				if (!validCons.length) continue;
-				if (queue.length === 0 || top === poly) { 
+				if (queue.length === 0 || top === poly) {
 					let rng = Math.floor(Math.random() * validCons.length);
 					top.addConnection(validCons[rng][1]);
 					validCons[rng][0].addConnection(validCons[rng][0].connections.indexOf(top));
@@ -162,22 +160,7 @@ const game = {
 			poly.pipesRotationDisplay = poly.pipesRotation;
 		}
 		game.calcLight();
-		initBoard();
 	},
-	makeGameFromUI() {
-		const type = document.getElementById("board-type").value;
-		const x = Number(document.getElementById("width").value);
-		const y = Number(document.getElementById("height").value);
-		if (x < 2 || x > 99) {
-			alert("Width must be between 2 and 99!");
-			return;
-		}
-		if (y < 2 || y > 99) {
-			alert("Height must be between 2 and 99!");
-			return;
-		}
-		game.generateGame(type, x, y);
-	}
 };
 
 const BOARD_TYPES = {
@@ -266,7 +249,7 @@ const BOARD_TYPES = {
 			for (let i = 0; i < y; i++) {
 				for (let j = -Math.min(i, y - 1 - i); j < x + Math.min(i, y - 1 - i); j++) {
 					game.board.set(
-						keyFrom(i * 2, j * 2 + 1), 
+						keyFrom(i * 2, j * 2 + 1),
 						new Polygon(6, sideLen, [(j + 1) * midptR * 2, i * sideLen * 3 + sideLen])
 					);
 				}
@@ -274,7 +257,7 @@ const BOARD_TYPES = {
 			for (let i = 0; i < y - 1; i++) {
 				for (let j = -Math.min(i, y - 2 - i); j < x + 1 + Math.min(i, y - 2 - i); j++) {
 					game.board.set(
-						keyFrom(i * 2 + 1, j * 2), 
+						keyFrom(i * 2 + 1, j * 2),
 						new Polygon(6, sideLen, [j * midptR * 2 + midptR, i * sideLen * 3 + sideLen * 2.5])
 					);
 				}
@@ -301,7 +284,7 @@ const BOARD_TYPES = {
 			for (let i = 0; i < y; i++) {
 				for (let j = 0; j < x; j++) {
 					game.board.set(
-						keyFrom(i, j * 2 + i % 2), 
+						keyFrom(i, j * 2 + i % 2),
 						new Polygon(6, sideLen, [(j * 2 + i % 2) * sideLen, (i + 1) * midptR * 2], Math.PI / 6)
 					);
 					game.board.set(
@@ -381,7 +364,7 @@ const BOARD_TYPES = {
 			}
 			for (let j = 0; j < x; j++) {
 				game.board.set(
-					keyFrom(y, j * 2), 
+					keyFrom(y, j * 2),
 					new Hologram(game.board.get(keyFrom(0, j * 2)), [j * 2 * sideLen, (y + 1) * midptR * 2])
 				);
 				game.board.set(
@@ -394,7 +377,7 @@ const BOARD_TYPES = {
 				);
 
 				game.board.set(
-					keyFrom(-1, j * 2 + 1), 
+					keyFrom(-1, j * 2 + 1),
 					new Hologram(game.board.get(keyFrom(y - 1, j * 2 + 1)), [(j * 2 + 1) * sideLen, 0])
 				);
 				game.board.set(
@@ -432,7 +415,7 @@ const BOARD_TYPES = {
 			for (let i = 0; i < x; i++) {
 				for (let j = 0; j < y; j++) {
 					game.board.set(
-						keyFrom(2 * i, 2 * j), 
+						keyFrom(2 * i, 2 * j),
 						new Polygon(8, sideLen, [(i + 0.5) * (sideLen + diag * 2), (j + 0.5) * (sideLen + diag * 2)])
 					);
 				}
@@ -440,7 +423,7 @@ const BOARD_TYPES = {
 			for (let i = 0; i < x - 1; i++) {
 				for (let j = 0; j < y - 1; j++) {
 					game.board.set(
-						keyFrom(2 * i + 1, 2 * j + 1), 
+						keyFrom(2 * i + 1, 2 * j + 1),
 						new Polygon(4, sideLen, [(i + 1) * (sideLen + diag * 2), (j + 1) * (sideLen + diag * 2)], Math.PI / 4)
 					);
 				}
@@ -544,7 +527,3 @@ const BOARD_TYPES = {
 		}
 	}
 }
-
-window.onload = () => requestAnimationFrame(() => game.generateGame("square", 5, 5));
-
-let startTime = Date.now();
