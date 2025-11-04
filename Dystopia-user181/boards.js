@@ -19,7 +19,6 @@ const game = {
 			poly.locked = true;
 			poly.lastCanvasUpdate = currentCanvasUpdate;
 		}
-		requestAnimationFrame(() => requestAnimationFrame(() => alert("You won!")));
 	},
 	calcLight() {
 		const hasLight = new Map();
@@ -156,7 +155,7 @@ const game = {
 		BOARD_TYPES[type].generate(x, y);
 		game.generateFromBoard();
 		for (const [_, poly] of game.board) {
-			poly.pipesRotation = Math.floor(Math.random() * poly.sides);
+			poly.pipesRotation = 0;//Math.floor(Math.random() * poly.sides);
 			poly.pipesRotationDisplay = poly.pipesRotation;
 		}
 		game.calcLight();

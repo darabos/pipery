@@ -4,7 +4,7 @@ let currentCanvasUpdate = 0;
 const glslCanvas = document.getElementById('glslCanvas');
 glslCanvas.onclick = () => {
   console.log('clicked');
-  updateCell(0, 0, Math.random(), Math.random(), Math.random(), 1.0);
+  updateCell(1, 1, Math.random(), Math.random(), Math.random(), 1.0);
 };
 function updateCell(x, y, r, g, b, a) {
   gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -37,11 +37,11 @@ const blockTypes = {
   0b011111: 12,
   0b111111: 13,
 };
-const sidesToTypesAndRotations = {};
+const pipesToTypesAndRotations = {};
 for (let s = 0; s < 64; s++) {
-  sidesToTypesAndRotations[s] = normalizeSides(s);
+  pipesToTypesAndRotations[s] = normalizePipes(s);
 }
-function normalizeSides(s) {
+function normalizePipes(s) {
   // try all rotations to find a known type
   for (let rot = 0; rot < 6; rot++) {
     const rs =
@@ -56,7 +56,7 @@ function normalizeSides(s) {
   }
 }
 const gl = glslCanvas.getContext('webgl2');
-const R = 5;
+const R = 60;
 const W = R * 4;
 const H = R * 4;
 const TYPE_MAX = 20;
@@ -66,9 +66,8 @@ boardToTextureData();
 function boardToTextureData() {
 	for (const [key, poly] of game.board) {
     const [x, y] = key.split('_').map(Number);
-		// poly.updatePipesRotationDisplay();
     const i = (y * W + x + 1 + R * W) * 4;
-    const tnr = sidesToTypesAndRotations[poly.pipes];
+    const tnr = pipesToTypesAndRotations[poly.pipes];
     data[i + 0] = Math.PI / 3 * tnr.rotation;
     data[i + 1] = tnr.type / TYPE_MAX;
     data[i + 2] = 2;
@@ -237,8 +236,8 @@ vec3 rot(in float angle, in vec3 p) {
 vec2 map(in vec3 pos) {
   vec2 res = vec2(pos.y, 0.0);
   pos.y -= 0.1;
-  pos.x += .5;
-  pos.z += 2.;
+  pos.x += 10.;
+  pos.z += 10.;
   ivec2 cell = hexagonID(pos.xz*5.);
   vec2 center = hexagonCenFromID(cell) * 0.2;
   vec2 uv = vec2(cell).yx;
@@ -251,40 +250,52 @@ vec2 map(in vec3 pos) {
   }
   float r = data.r;// + iTime*0.1;
   pos -= vec3(center.x, 0.0, center.y);
-  // res = opU(res, vec2(sdCapsule(rot(r*5., pos), vec3(0., 0.04, -0.5), vec3(0., 0.04, 0.5), 0.04), 3.5));
-  vec2 straight = vec2(sdCylinder(rot(r*5., pos+vec3(0.,-.05,0.)), 0.04), 5.5);
-  vec2 straight60 = vec2(sdCylinder(rot(r*5.+1.05, pos+vec3(0.,-.05,0.)), 0.04), 5.5);
-  vec2 straight120 = vec2(sdCylinder(rot(r*5.+2.1, pos+vec3(0.,-.05,0.)), 0.04), 5.5);
-  vec2 bigbend = vec2(sdTorus(rot(r*5., pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5);
-  vec2 bigbend60 = vec2(sdTorus(rot(r*5.+1.05, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5);
-  vec2 smallbend = vec2(sdTorus(rot(r*5., pos)+vec3(0.2,-.05,0.1155), vec2(0.1155, 0.04)), 5.5);
+  vec2 seg = vec2(sdCapsule(rot(r, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), 5.5);
+  vec2 seg60 = vec2(sdCapsule(rot(r-1.05, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), 5.5);
+  vec2 seg120 = vec2(sdCapsule(rot(r-2.1, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), 5.5);
+  vec2 seg240 = vec2(sdCapsule(rot(r-4.2, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), 5.5);
+  // vec2 seg = vec2(sdTorus(rot(r, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 4.5);
+  vec2 straight = vec2(sdCylinder(rot(r, pos+vec3(0.,-.05,0.)), 0.04), 5.5);
+  vec2 straight60 = vec2(sdCylinder(rot(r-1.05, pos+vec3(0.,-.05,0.)), 0.04), 5.5);
+  vec2 straight120 = vec2(sdCylinder(rot(r-2.1, pos+vec3(0.,-.05,0.)), 0.04), 5.5);
+  vec2 bigbend = vec2(sdTorus(rot(r+2.1, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5);
+  vec2 bigbend60 = vec2(sdTorus(rot(r+1.05, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5);
+  vec2 smallbend = vec2(sdTorus(rot(r+2.1, pos)+vec3(0.2,-.05,0.1155), vec2(0.1155, 0.04)), 5.5);
   if (ty < 1.5) { // 000001
+    res = opU(res, seg);
   } else if (ty < 2.5) { // 000011
     res = opU(res, smallbend);
   } else if (ty < 3.5) { // 000101
     res = opU(res, bigbend);
   } else if (ty < 4.5) { // 000111
+    res = opU(res, seg);
+    res = opU(res, seg60);
+    res = opU(res, seg120);
   } else if (ty < 5.5) { // 001001
     res = opU(res, straight);
   } else if (ty < 6.5) { // 001011
     res = opU(res, straight);
-    //
+    res = opU(res, bigbend60);
   } else if (ty < 7.5) { // 001101
     res = opU(res, straight);
-    //
+    res = opU(res, bigbend);
   } else if (ty < 8.5) { // 001111
     res = opU(res, bigbend);
     res = opU(res, bigbend60);
   } else if (ty < 9.5) { // 010101
+    res = opU(res, seg);
+    res = opU(res, seg120);
+    res = opU(res, seg240);
   } else if (ty < 10.5) { // 010111
-    res = opU(res, straight);
-    //
+    res = opU(res, straight60);
+    res = opU(res, bigbend);
   } else if (ty < 11.5) { // 011011
     res = opU(res, straight);
     res = opU(res, straight60);
-  } else if (ty < 12.5) { // 011011
+  } else if (ty < 12.5) { // 011111
     res = opU(res, straight);
     res = opU(res, straight60);
+    res = opU(res, seg120);
   } else { // 111111
     res = opU(res, straight);
     res = opU(res, straight60);
