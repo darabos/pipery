@@ -6,6 +6,42 @@ glslCanvas.onclick = () => {
   console.log('clicked');
   updateCell(1, 1, Math.random(), Math.random(), Math.random(), 1.0);
 };
+let camV = [0, 0, 0];
+let cameraPos = [0, 0, 0];
+function onDraw() {
+  const CAM_SPEED = 0.01;
+  camV[0] *= 0.9;
+  camV[1] *= 0.9;
+  camV[2] *= 0.9;
+  if (keysDown['ArrowUp']) {
+    camV[0] -= CAM_SPEED;
+  }
+  if (keysDown['ArrowDown']) {
+    camV[0] += CAM_SPEED;
+  }
+  if (keysDown['ArrowRight']) {
+    camV[2] -= CAM_SPEED;
+  }
+  if (keysDown['ArrowLeft']) {
+    camV[2] += CAM_SPEED;
+  }
+  cameraPos[0] += camV[0];
+  cameraPos[1] += camV[1];
+  cameraPos[2] += camV[2];
+  const program = gl.getParameter(gl.CURRENT_PROGRAM);
+  if (program) {
+    const loc = gl.getUniformLocation(program, "cameraPos");
+    gl.uniform3fv(loc, cameraPos);
+  }
+}
+const keysDown = {};
+window.onkeydown = (e) => {
+  keysDown[e.key] = true;
+};
+window.onkeyup = (e) => {
+  keysDown[e.key] = false;
+};
+
 function updateCell(x, y, r, g, b, a) {
   gl.bindTexture(gl.TEXTURE_2D, texture);
   const pixel = new Float32Array([r, g, b, a]);
@@ -56,7 +92,7 @@ function normalizePipes(s) {
   }
 }
 const gl = glslCanvas.getContext('webgl2');
-const R = 60;
+const R = 30;
 const W = R * 4;
 const H = R * 4;
 const TYPE_MAX = 20;
@@ -74,7 +110,6 @@ function boardToTextureData() {
     data[i + 3] = 1;
   }
 }
-console.log('texture data:', data);
 const texture = gl.createTexture();
 gl.bindTexture(gl.TEXTURE_2D, texture);
 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -87,10 +122,12 @@ gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, W, H, 0, gl.RGBA, gl.FLOAT, data);
   toy.addTexture(texture, 'game');
   toy.setCommon("");
   toy.setImage({source, iChannel0: 'game'});
+  toy.setOnDraw(onDraw);
   toy.play();
-})(glsl`
+})(glsl`  // Based on https://www.shadertoy.com/view/Xds3zN by Inigo Quilez.
 
-// Based on https://www.shadertoy.com/view/Xds3zN by Inigo Quilez.
+uniform vec3 cameraPos;
+
 #define AA 1
 
 //------------------------------------------------------------------
@@ -236,19 +273,18 @@ vec3 rot(in float angle, in vec3 p) {
 vec2 map(in vec3 pos) {
   vec2 res = vec2(pos.y, 0.0);
   pos.y -= 0.1;
-  pos.x += 10.;
-  pos.z += 10.;
+  pos.x += 1.;
+  pos.z += 1.;
   ivec2 cell = hexagonID(pos.xz*5.);
   vec2 center = hexagonCenFromID(cell) * 0.2;
   vec2 uv = vec2(cell).yx;
-  // uv.x /= 2.;
   uv.y += ${R}.;
   vec4 data = texture(iChannel0, uv / ${W}.);
   float ty = data.g * ${TYPE_MAX}.;
   if (ty < 0.5) { // 000000
     return res;
   }
-  float r = data.r;// + iTime*0.1;
+  float r = data.r;
   pos -= vec3(center.x, 0.0, center.y);
   vec2 seg = vec2(sdCapsule(rot(r, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), 5.5);
   vec2 seg60 = vec2(sdCapsule(rot(r-1.05, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), 5.5);
@@ -337,9 +373,9 @@ vec2 raycast(in vec3 ro, in vec3 rd) {
     tmax = min(tb.y, tmax);
 
     float t = tmin;
-    for(int i = 0; i < 70 && t < tmax; i++) {
+    for(int i = 0; i < 20 && t < tmax; i++) {
       vec2 h = map(ro + rd * t);
-      if(abs(h.x) < (0.0001 * t)) {
+      if(abs(h.x) < (0.001 * t)) {
         res = vec2(t, h.y);
         break;
       }
@@ -507,11 +543,10 @@ mat3 setCamera(in vec3 ro, in vec3 ta, float cr) {
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
   vec2 mo = iMouse.xy / iResolution.xy;
-  float time = 32.0;// + iTime * 1.5;
 
     // camera
-  vec3 ta = vec3(0., 0., 0.);
-  vec3 ro = ta + vec3(4.5 * cos(0.1 * time + 7.0 * mo.x), 5.2, 4.5 * sin(0.1 * time + 7.0 * mo.x));
+  vec3 ta = cameraPos;
+  vec3 ro = ta + vec3(5., 5., 0.);
     // camera-to-world transformation
   mat3 ca = setCamera(ro, ta, 0.0);
 
@@ -526,7 +561,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 #endif
 
         // focal length
-      const float fl = 2.5;
+      const float fl = 3.5;
 
         // ray direction
       vec3 rd = ca * normalize(vec3(p, fl));
