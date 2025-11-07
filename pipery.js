@@ -2,12 +2,43 @@ const glsl = (strings, ...values) =>
   values.reduce((acc, v, i) => acc + `${v}` + strings[i + 1], strings[0]);
 let currentCanvasUpdate = 0;
 const glslCanvas = document.getElementById('glslCanvas');
-glslCanvas.onclick = () => {
-  console.log('clicked');
-  const cell = game.board.get('0_1');
+glslCanvas.onmousemove = (e) => {
+  const [x, y] = [e.offsetX, e.offsetY];
+  const [cx, cy] = pixelToCell(x, y);
+  const key = `${cy-1}_${cx}`;
+  const cell = game.board.get(key);
+  if (!cell) {
+    return;
+  }
   cell.locked = !cell.locked;
-  updateCell('0_1', cell);
+  updateCell(key, cell);
 };
+function pixelToCell(x, y) {
+  const fl = 3.5;
+  let p = [x/250-2, 1-y/250, fl];
+  p = p.map(v => v / Math.hypot(...p));
+  const rd = [-0.707*p[1] - 0.707 * p[2], 0.707 * p[1] - 0.707 * p[2], -p[0]];
+  const ro = [cameraPos[0] + 5., cameraPos[1] + 5., cameraPos[2] + 0.];
+  const len = (ro[1]-0.2) / rd[1];
+  const ix = ro[0] - rd[0] * len + R/3;
+  const iy = ro[2] - rd[2] * len + R/3;
+  function mod3(n) {
+      return (n<0) ? 2-((2-n)%3) : n%3;
+  }
+  function hexagonID(x, y) {
+    const k3 = 1.732050807;
+    const q = [x, y*k3*0.5 + x*0.5];
+    const pi = q.map(v => Math.floor(v));
+    const pf = q.map(v => v - Math.floor(v));
+    const v = mod3(pi[0]+pi[1]);
+    const ca = (v<1)?0:1;
+    const cb = (v<2)?0:1;
+    const ma = (pf[0]>pf[1])?[0,1]:[1,0];
+    const id = [pi[0] + ca - cb*ma[0], pi[1] + ca - cb*ma[1]];
+    return [ id[0], id[1] - Math.floor((id[0]+id[1])/3) ];
+  }
+  return hexagonID(ix*5., iy*5.);
+}
 let camV = [0, 0, 0];
 let cameraPos = [0, 0, 0];
 function onDraw() {
@@ -66,7 +97,7 @@ function polyToPixel(poly) {
   pixel[0] = Math.PI / 3 * (tnr.rotation - poly.pipesRotationDisplay);
   pixel[1] = tnr.type / TYPE_MAX;
   pixel[2] = (poly.hasLight ? poly.hasCycle ? 4.7 : 5.5 : 1.5) / 10;
-  pixel[3] = (poly.locked ? 3.9 : 3.5) / 10;
+  pixel[3] = (poly.locked ? 3.0 : 3.5) / 10;
 }
 const blockTypes = {
   0b000000: 0,
@@ -103,7 +134,7 @@ function normalizePipes(s) {
   }
 }
 const gl = glslCanvas.getContext('webgl2');
-const R = 9;
+const R = 5;
 const W = R * 4;
 const H = R * 4;
 const TYPE_MAX = 20;
@@ -213,7 +244,9 @@ vec2 map(in vec3 pos) {
   float color = data.b * 10.;
   pos -= vec3(center.x, 0.0, center.y);
   if (ty < 0.5) { // 000000
-    return res;
+    // Off the board. We should look at two neighbor cells and take the lowest distance.
+    // But for now we just underestimate the distance instead, to reduce the glitches at the edges.
+    return res * 0.5;
   }
   vec2 seg = vec2(sdCapsule(rot(r, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), color);
   vec2 seg60 = vec2(sdCapsule(rot(r-1.05, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), color);
