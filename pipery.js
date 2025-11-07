@@ -2,7 +2,11 @@ const glsl = (strings, ...values) =>
   values.reduce((acc, v, i) => acc + `${v}` + strings[i + 1], strings[0]);
 let currentCanvasUpdate = 0;
 const glslCanvas = document.getElementById('glslCanvas');
-glslCanvas.onmousemove = (e) => {
+glslCanvas.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    return false;
+}, false);
+glslCanvas.onmousedown = (e) => {
   const [x, y] = [e.offsetX, e.offsetY];
   const [cx, cy] = pixelToCell(x, y);
   const key = `${cy-1}_${cx}`;
@@ -10,7 +14,16 @@ glslCanvas.onmousemove = (e) => {
   if (!cell) {
     return;
   }
-  cell.locked = !cell.locked;
+  if (e.button === 0) {
+    if (e.shiftKey) {
+      cell.pipesRotateAnticlockwise();
+    } else {
+      cell.pipesRotateClockwise();
+    }
+    cell.pipesRotationDisplay = cell.pipesRotation;
+  } else if (e.button === 2) {
+    cell.locked = !cell.locked;
+  }
   updateCell(key, cell);
 };
 function pixelToCell(x, y) {
