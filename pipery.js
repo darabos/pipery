@@ -141,28 +141,8 @@ uniform vec3 cameraPos;
 
 #define AA 1
 
-//------------------------------------------------------------------
-float dot2(in vec2 v) {
-  return dot(v, v);
-}
-float dot2(in vec3 v) {
-  return dot(v, v);
-}
-float ndot(in vec2 a, in vec2 b) {
-  return a.x * b.x - a.y * b.y;
-}
-
-float sdPlane(vec3 p) {
-  return p.y;
-}
-
 float sdSphere(vec3 p, float s) {
   return length(p) - s;
-}
-
-float sdBox(vec3 p, vec3 b) {
-  vec3 d = abs(p) - b;
-  return min(max(d.x, max(d.y, d.z)), 0.0) + length(max(d, 0.0));
 }
 
 float sdCapsule(vec3 p, vec3 a, vec3 b, float r) {
@@ -171,66 +151,19 @@ float sdCapsule(vec3 p, vec3 a, vec3 b, float r) {
   return length(pa - ba * h) - r;
 }
 
-// horizontal
 float sdCylinder(vec3 p, float w) {
   return length(p.yz) - w;
 }
 
-// arbitrary orientation
-float sdCylinder(vec3 p, vec3 a, vec3 b, float r) {
-  vec3 pa = p - a;
-  vec3 ba = b - a;
-  float baba = dot(ba, ba);
-  float paba = dot(pa, ba);
-
-  float x = length(pa * baba - ba * paba) - r * baba;
-  float y = abs(paba - baba * 0.5) - baba * 0.5;
-  float x2 = x * x;
-  float y2 = y * y * baba;
-  float d = (max(x, y) < 0.0) ? -min(x2, y2) : (((x > 0.0) ? x2 : 0.0) + ((y > 0.0) ? y2 : 0.0));
-  return sign(d) * sqrt(abs(d)) / baba;
+float sdTorus( vec3 p, vec2 t ) {
+    return length( vec2(length(p.xz)-t.x,p.y) )-t.y;
 }
-
-// c is the sin/cos of the desired cone angle
-float sdSolidAngle(vec3 pos, vec2 c, float ra) {
-  vec2 p = vec2(length(pos.xz), pos.y);
-  float l = length(p) - ra;
-  float m = length(p - c * clamp(dot(p, c), 0.0, ra));
-  return max(l, m * sign(c.y * p.x - c.x * p.y));
-}
-
-float sdHorseshoe(in vec3 p, in vec2 c, in float r, in float le, vec2 w) {
-  p.x = abs(p.x);
-  float l = length(p.xy);
-  p.xy = mat2(-c.x, c.y, c.y, c.x) * p.xy;
-  p.xy = vec2((p.y > 0.0 || p.x > 0.0) ? p.x : l * sign(-c.x), (p.x > 0.0) ? p.y : l);
-  p.xy = vec2(p.x, abs(p.y - r)) - vec2(le, 0.0);
-
-  vec2 q = vec2(length(max(p.xy, 0.0)) + min(0.0, max(p.x, p.y)), p.z);
-  vec2 d = abs(q) - w;
-  return min(max(d.x, d.y), 0.0) + length(max(d, 0.0));
-}
-
-float sdU(in vec3 p, in float r, in float le, vec2 w) {
-  p.x = (p.y > 0.0) ? abs(p.x) : length(p.xy);
-  p.x = abs(p.x - r);
-  p.y = p.y - le;
-  float k = max(p.x, p.y);
-  vec2 q = vec2((k < 0.0) ? -k : length(max(p.xy, 0.0)), abs(p.z)) - w;
-  return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0);
-}
-
-//------------------------------------------------------------------
 
 vec2 opU(vec2 d1, vec2 d2) {
   return (d1.x < d2.x) ? d1 : d2;
 }
 
-//------------------------------------------------------------------
-
 #define ZERO (min(iFrame,0))
-
-
 
 // From https://www.shadertoy.com/view/WtSfWK by Iñigo Quílez.
 int mod3( int n ) {
@@ -256,21 +189,6 @@ ivec2 hexagonID( vec2 p ) {
 vec2 hexagonCenFromID( in ivec2 id ) {
     const float k3 = 1.732050807;
     return vec2(float(id.x),float(id.y)*k3);
-}
-
-// Repeat space along a hexagonal grid of cell size 's'
-vec2 opRepHex(vec2 p, float s) {
-    vec2 a = s * vec2(1.0, 0.0);
-    vec2 b = s * vec2(0.5, 0.8660254);
-    mat2 m  = mat2(a, b);          // columns = basis
-    mat2 inv = inverse(m);         // change of basis
-    vec2 uv = inv * p;             // into hex space
-    uv = fract(uv) - 0.5;          // keep within [-0.5, 0.5]
-    return m * uv;                 // back to cartesian
-}
-
-float sdTorus( vec3 p, vec2 t ) {
-    return length( vec2(length(p.xz)-t.x,p.y) )-t.y;
 }
 
 vec3 rot(in float angle, in vec3 p) {
@@ -502,9 +420,9 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 rdx, in vec3 rdy) {
       float dif = clamp(dot(nor, lig), 0.0, 1.0);
           //if( dif>0.0001 )
       dif *= calcSoftshadow(pos, lig, 0.02, 2.5);
-      float spe = pow(clamp(dot(nor, hal), 0.0, 1.0), 16.0);
+      float spe = pow(clamp(dot(nor, hal), 0.0, 1.0), 36.0);
       spe *= dif;
-      spe *= 0.04 + 0.96 * pow(clamp(1.0 - dot(hal, lig), 0.0, 1.0), 5.0);
+      spe *= 0.14 + 0.96 * pow(clamp(1.0 - dot(hal, lig), 0.0, 1.0), 5.0);
                 //spe *= 0.04+0.96*pow(clamp(1.0-sqrt(0.5*(1.0-dot(rd,lig))),0.0,1.0),5.0);
       lin += col * 2.20 * dif * vec3(1.30, 1.00, 0.70);
       lin += 5.00 * spe * vec3(1.30, 1.00, 0.70) * ks;
