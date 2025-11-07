@@ -20,11 +20,9 @@ glslCanvas.onmousedown = (e) => {
     } else {
       cell.pipesRotateClockwise();
     }
-    cell.pipesRotationDisplay = cell.pipesRotation;
   } else if (e.button === 2) {
     cell.locked = !cell.locked;
   }
-  updateCell(key, cell);
 };
 function pixelToCell(x, y) {
   const fl = 3.5;
@@ -59,16 +57,16 @@ function onDraw() {
   camV[0] *= 0.9;
   camV[1] *= 0.9;
   camV[2] *= 0.9;
-  if (keysDown['ArrowUp']) {
+  if (keysDown['ArrowUp'] || keysDown['w']) {
     camV[0] -= CAM_SPEED;
   }
-  if (keysDown['ArrowDown']) {
+  if (keysDown['ArrowDown'] || keysDown['s']) {
     camV[0] += CAM_SPEED;
   }
-  if (keysDown['ArrowRight']) {
+  if (keysDown['ArrowRight'] || keysDown['d']) {
     camV[2] -= CAM_SPEED;
   }
-  if (keysDown['ArrowLeft']) {
+  if (keysDown['ArrowLeft'] || keysDown['a']) {
     camV[2] += CAM_SPEED;
   }
   cameraPos[0] += camV[0];
@@ -79,6 +77,7 @@ function onDraw() {
     const loc = gl.getUniformLocation(program, "cameraPos");
     gl.uniform3fv(loc, cameraPos);
   }
+  updateCells();
 }
 const keysDown = {};
 window.onkeydown = (e) => {
@@ -89,21 +88,10 @@ window.onkeyup = (e) => {
 };
 
 const pixel = new Float32Array([0, 0, 0, 0]);
-function updateCell(key, poly) {
+function updateCells() {
+  boardToTextureData();
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  const [x, y] = key.split('_').map(Number);
-  polyToPixel(poly);
-  gl.texSubImage2D(
-      gl.TEXTURE_2D,    // target
-      0,                // mip level
-      x+1,                // x offset (in texels)
-      y+R,                // y offset (in texels)
-      1,                // width
-      1,                // height
-      gl.RGBA,          // format
-      gl.FLOAT,         // type
-      pixel             // data
-  );
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, W, H, gl.RGBA, gl.FLOAT, data);
 }
 function polyToPixel(poly) {
   const tnr = pipesToTypesAndRotations[poly.pipes];
@@ -147,7 +135,7 @@ function normalizePipes(s) {
   }
 }
 const gl = glslCanvas.getContext('webgl2');
-const R = 5;
+const R = 15;
 const W = R * 4;
 const H = R * 4;
 const TYPE_MAX = 20;
@@ -158,6 +146,7 @@ function boardToTextureData() {
 	for (const [key, poly] of game.board) {
     const [x, y] = key.split('_').map(Number);
     const i = (y * W + x + 1 + R * W) * 4;
+    poly.updatePipesRotationDisplay();
     polyToPixel(poly);
     data[i + 0] = pixel[0];
     data[i + 1] = pixel[1];
