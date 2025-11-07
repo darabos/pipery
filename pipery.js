@@ -4,7 +4,9 @@ let currentCanvasUpdate = 0;
 const glslCanvas = document.getElementById('glslCanvas');
 glslCanvas.onclick = () => {
   console.log('clicked');
-  updateCell(1, 1, Math.random(), Math.random(), Math.random(), 1.0);
+  const cell = game.board.get('0_1');
+  cell.locked = !cell.locked;
+  updateCell('0_1', cell);
 };
 let camV = [0, 0, 0];
 let cameraPos = [0, 0, 0];
@@ -42,20 +44,29 @@ window.onkeyup = (e) => {
   keysDown[e.key] = false;
 };
 
-function updateCell(x, y, r, g, b, a) {
+const pixel = new Float32Array([0, 0, 0, 0]);
+function updateCell(key, poly) {
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  const pixel = new Float32Array([r, g, b, a]);
+  const [x, y] = key.split('_').map(Number);
+  polyToPixel(poly);
   gl.texSubImage2D(
       gl.TEXTURE_2D,    // target
       0,                // mip level
-      x,                // x offset (in texels)
-      y,                // y offset (in texels)
+      x+1,                // x offset (in texels)
+      y+R,                // y offset (in texels)
       1,                // width
       1,                // height
       gl.RGBA,          // format
       gl.FLOAT,         // type
       pixel             // data
   );
+}
+function polyToPixel(poly) {
+  const tnr = pipesToTypesAndRotations[poly.pipes];
+  pixel[0] = Math.PI / 3 * (tnr.rotation - poly.pipesRotationDisplay);
+  pixel[1] = tnr.type / TYPE_MAX;
+  pixel[2] = (poly.hasLight ? poly.hasCycle ? 4.7 : 5.5 : 1.5) / 10;
+  pixel[3] = (poly.locked ? 3.9 : 3.5) / 10;
 }
 const blockTypes = {
   0b000000: 0,
@@ -92,7 +103,7 @@ function normalizePipes(s) {
   }
 }
 const gl = glslCanvas.getContext('webgl2');
-const R = 30;
+const R = 9;
 const W = R * 4;
 const H = R * 4;
 const TYPE_MAX = 20;
@@ -103,11 +114,11 @@ function boardToTextureData() {
 	for (const [key, poly] of game.board) {
     const [x, y] = key.split('_').map(Number);
     const i = (y * W + x + 1 + R * W) * 4;
-    const tnr = pipesToTypesAndRotations[poly.pipes];
-    data[i + 0] = Math.PI / 3 * tnr.rotation;
-    data[i + 1] = tnr.type / TYPE_MAX;
-    data[i + 2] = 2;
-    data[i + 3] = 1;
+    polyToPixel(poly);
+    data[i + 0] = pixel[0];
+    data[i + 1] = pixel[1];
+    data[i + 2] = pixel[2];
+    data[i + 3] = pixel[3];
   }
 }
 const texture = gl.createTexture();
@@ -272,31 +283,30 @@ vec3 rot(in float angle, in vec3 p) {
 
 vec2 map(in vec3 pos) {
   vec2 res = vec2(pos.y, 0.0);
+  pos.xz += float(${R/3});
   pos.y -= 0.1;
-  pos.x += 1.;
-  pos.z += 1.;
   ivec2 cell = hexagonID(pos.xz*5.);
   vec2 center = hexagonCenFromID(cell) * 0.2;
   vec2 uv = vec2(cell).yx;
   uv.y += ${R}.;
   vec4 data = texture(iChannel0, uv / ${W}.);
   float ty = data.g * ${TYPE_MAX}.;
+  float r = data.r;
+  float color = data.b * 10.;
+  pos -= vec3(center.x, 0.0, center.y);
   if (ty < 0.5) { // 000000
     return res;
   }
-  float r = data.r;
-  pos -= vec3(center.x, 0.0, center.y);
-  vec2 seg = vec2(sdCapsule(rot(r, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), 5.5);
-  vec2 seg60 = vec2(sdCapsule(rot(r-1.05, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), 5.5);
-  vec2 seg120 = vec2(sdCapsule(rot(r-2.1, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), 5.5);
-  vec2 seg240 = vec2(sdCapsule(rot(r-4.2, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), 5.5);
-  // vec2 seg = vec2(sdTorus(rot(r, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 4.5);
-  vec2 straight = vec2(sdCylinder(rot(r, pos+vec3(0.,-.05,0.)), 0.04), 5.5);
-  vec2 straight60 = vec2(sdCylinder(rot(r-1.05, pos+vec3(0.,-.05,0.)), 0.04), 5.5);
-  vec2 straight120 = vec2(sdCylinder(rot(r-2.1, pos+vec3(0.,-.05,0.)), 0.04), 5.5);
-  vec2 bigbend = vec2(sdTorus(rot(r+2.1, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5);
-  vec2 bigbend60 = vec2(sdTorus(rot(r+1.05, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), 5.5);
-  vec2 smallbend = vec2(sdTorus(rot(r+2.1, pos)+vec3(0.2,-.05,0.1155), vec2(0.1155, 0.04)), 5.5);
+  vec2 seg = vec2(sdCapsule(rot(r, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), color);
+  vec2 seg60 = vec2(sdCapsule(rot(r-1.05, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), color);
+  vec2 seg120 = vec2(sdCapsule(rot(r-2.1, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), color);
+  vec2 seg240 = vec2(sdCapsule(rot(r-4.2, pos), vec3(0., .05, 0.), vec3(0.4, .05, 0.0), 0.04), color);
+  vec2 straight = vec2(sdCylinder(rot(r, pos+vec3(0.,-.05,0.)), 0.04), color);
+  vec2 straight60 = vec2(sdCylinder(rot(r-1.05, pos+vec3(0.,-.05,0.)), 0.04), color);
+  vec2 straight120 = vec2(sdCylinder(rot(r-2.1, pos+vec3(0.,-.05,0.)), 0.04), color);
+  vec2 bigbend = vec2(sdTorus(rot(r+2.1, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), color);
+  vec2 bigbend60 = vec2(sdTorus(rot(r+1.05, pos)+vec3(0.4,-.05,0.), vec2(0.3464, 0.04)), color);
+  vec2 smallbend = vec2(sdTorus(rot(r+2.1, pos)+vec3(0.2,-.05,0.1155), vec2(0.1155, 0.04)), color);
   if (ty < 1.5) { // 000001
     res = opU(res, seg);
   } else if (ty < 2.5) { // 000011
@@ -304,9 +314,8 @@ vec2 map(in vec3 pos) {
   } else if (ty < 3.5) { // 000101
     res = opU(res, bigbend);
   } else if (ty < 4.5) { // 000111
-    res = opU(res, seg);
-    res = opU(res, seg60);
-    res = opU(res, seg120);
+    res = opU(res, bigbend);
+    res = opU(res, smallbend);
   } else if (ty < 5.5) { // 001001
     res = opU(res, straight);
   } else if (ty < 6.5) { // 001011
@@ -337,7 +346,7 @@ vec2 map(in vec3 pos) {
     res = opU(res, straight60);
     res = opU(res, straight120);
   }
-  res = opU(res, vec2(sdSphere(pos+vec3(0.,0.45,0.), .5), 3.5));
+  res = opU(res, vec2(sdSphere(pos+vec3(0.,0.45,0.), .5), data.a * 10.));
   return res;
 }
 
