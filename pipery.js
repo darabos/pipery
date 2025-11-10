@@ -2,6 +2,12 @@ const glsl = (strings, ...values) =>
   values.reduce((acc, v, i) => acc + `${v}` + strings[i + 1], strings[0]);
 let currentCanvasUpdate = 0;
 const glslCanvas = document.getElementById('glslCanvas');
+let HEIGHT = 500;
+if (window.innerHeight > window.innerWidth) {
+  glslCanvas.width = 500;
+  glslCanvas.height = 1000;
+  HEIGHT = 1000;
+}
 glslCanvas.addEventListener('contextmenu', function(e) {
     e.preventDefault();
     return false;
@@ -26,7 +32,7 @@ glslCanvas.onmousedown = (e) => {
 };
 function pixelToCell(x, y) {
   const fl = 3.5;
-  let p = [x/250-2, 1-y/250, fl];
+  let p = [2*x/HEIGHT-2, 1-2*y/HEIGHT, fl];
   p = p.map(v => v / Math.hypot(...p));
   const rd = [-0.707*p[1] - 0.707 * p[2], 0.707 * p[1] - 0.707 * p[2], -p[0]];
   const ro = [cameraPos[0] + 5., cameraPos[1] + 5., cameraPos[2] + 0.];
