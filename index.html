@@ -12,17 +12,23 @@
         align-items: center;
         height: 100vh;
         background: radial-gradient(circle, #000, #321);
+        color: #fff8;
+        overflow: hidden;
       }
       a {
         color: #fff8;
         display: inline-block;
-        padding: 10px;
+        padding: 0 10px;
         text-decoration: none;
+      }
+      div {
+        margin: 10px;
       }
     </style>
   </head>
   <body>
-    <canvas id="glslCanvas" width="1000" height="500"></canvas>
+    <div>Resolution: <input id="resolutionSlider" type="range" min="0.1" max="3" step="0.1" value="1"/> </div>
+    <canvas id="glslCanvas" width="1024" height="512" style="width: 100vw; height: calc(100vh - 80px);"></canvas>
     <div>
       <a>Controls: WASD or arrow keys, click, shift-click, right-click.</a>
       <a href="https://dystopia-user181.github.io/connect-pipes-polygonal/">Original by Dystopia-user181</a>

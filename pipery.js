@@ -2,22 +2,30 @@ const glsl = (strings, ...values) =>
   values.reduce((acc, v, i) => acc + `${v}` + strings[i + 1], strings[0]);
 let currentCanvasUpdate = 0;
 const glslCanvas = document.getElementById('glslCanvas');
-let HEIGHT = 500;
-if (window.innerHeight > window.innerWidth) {
-  glslCanvas.width = 500;
-  glslCanvas.height = 1000;
-  HEIGHT = 1000;
+function onResize() {
+  resolutionSlider.max = window.devicePixelRatio || 3;
+  const dpr = resolutionSlider.valueAsNumber;
+  const rect = glslCanvas.getBoundingClientRect();
+  glslCanvas.width = rect.width * dpr;
+  glslCanvas.height = rect.height * dpr;
 }
-window.addEventListener('wheel', (e) => {
+onResize();
+window.addEventListener('resize', onResize);
+resolutionSlider.oninput = (e) => {
+  onResize();
+}
+glslCanvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
   cameraPos[0] += e.deltaY*0.01;
   cameraPos[2] -= e.deltaX*0.01;
-}, {passive: true});
+});
 glslCanvas.addEventListener('contextmenu', function(e) {
     e.preventDefault();
     return false;
 }, false);
 glslCanvas.onmousedown = (e) => {
-  const [x, y] = [e.offsetX, e.offsetY];
+  const x = (2 * e.offsetX - glslCanvas.clientWidth) / glslCanvas.clientHeight;
+  const y = 1 - 2 * e.offsetY / glslCanvas.clientHeight;
   const [cx, cy] = pixelToCell(x, y);
   const key = `${cy-1}_${cx}`;
   const cell = game.board.get(key);
@@ -36,7 +44,7 @@ glslCanvas.onmousedown = (e) => {
 };
 function pixelToCell(x, y) {
   const fl = 3.5;
-  let p = [2*x/HEIGHT-2, 1-2*y/HEIGHT, fl];
+  let p = [x, y, fl];
   p = p.map(v => v / Math.hypot(...p));
   const rd = [-0.707*p[1] - 0.707 * p[2], 0.707 * p[1] - 0.707 * p[2], -p[0]];
   const ro = [cameraPos[0] + 5., cameraPos[1] + 5., cameraPos[2] + 0.];
