@@ -8,6 +8,10 @@ if (window.innerHeight > window.innerWidth) {
   glslCanvas.height = 1000;
   HEIGHT = 1000;
 }
+window.addEventListener('wheel', (e) => {
+  cameraPos[0] += e.deltaY*0.01;
+  cameraPos[2] -= e.deltaX*0.01;
+}, {passive: true});
 glslCanvas.addEventListener('contextmenu', function(e) {
     e.preventDefault();
     return false;
