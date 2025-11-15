@@ -375,7 +375,7 @@ float calcSoftshadow(in vec3 ro, in vec3 rd, in float mint, in float tmax) {
 
   float res = 1.0;
   float t = mint;
-  for(int i = ZERO; i < 24; i++) {
+  for(int i = ZERO; i < 12; i++) {
     float h = map(ro + rd * t).x;
     float s = clamp(8.0 * h / t, 0.0, 1.0);
     res = min(res, s);
@@ -488,7 +488,7 @@ vec3 render(in vec3 ro, in vec3 rd, in vec3 rdx, in vec3 rdy) {
       spe *= dif;
       spe *= 0.04 + 0.96 * pow(clamp(1.0 + dot(nor, rd), 0.0, 1.0), 5.0);
           //if( spe>0.001 )
-      spe *= calcSoftshadow(pos, ref, 0.02, 2.5);
+      // spe *= calcSoftshadow(pos, ref, 0.02, 2.5);
       lin += col * 0.60 * dif * vec3(0.40, 0.60, 1.15);
       lin += 2.00 * spe * vec3(0.40, 0.60, 1.30) * ks;
     }
@@ -522,8 +522,6 @@ mat3 setCamera(in vec3 ro, in vec3 ta, float cr) {
 }
 
 void mainImage(out vec4 fragColor, in vec2 fragCoord) {
-  vec2 mo = iMouse.xy / iResolution.xy;
-
     // camera
   vec3 ta = cameraPos;
   vec3 ro = ta + vec3(5., 5., 0.);
