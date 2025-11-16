@@ -2,6 +2,7 @@ const glsl = (strings, ...values) =>
   values.reduce((acc, v, i) => acc + `${v}` + strings[i + 1], strings[0]);
 let currentCanvasUpdate = 0;
 const glslCanvas = document.getElementById('glslCanvas');
+resolutionSlider.value = localStorage.getItem('resolution') || 1;
 function onResize() {
   resolutionSlider.max = window.devicePixelRatio || 3;
   const dpr = resolutionSlider.valueAsNumber;
@@ -12,12 +13,46 @@ function onResize() {
 onResize();
 window.addEventListener('resize', onResize);
 resolutionSlider.oninput = (e) => {
+  localStorage.setItem('resolution', e.target.value);
   onResize();
 }
 glslCanvas.addEventListener('wheel', (e) => {
   e.preventDefault();
   cameraPos[0] += e.deltaY*0.01;
   cameraPos[2] -= e.deltaX*0.01;
+});
+let lastTouchX = null;
+let lastTouchY = null;
+let longPressTimeout = null;
+glslCanvas.addEventListener('touchstart', (e) => {
+  lastTouchX = e.touches[0].clientX;
+  lastTouchY = e.touches[0].clientY;
+  longPressTimeout = setTimeout(() => {
+    glslCanvas.onmousedown({
+      offsetX: lastTouchX - glslCanvas.getBoundingClientRect().left,
+      offsetY: lastTouchY - glslCanvas.getBoundingClientRect().top,
+      button: 2,
+    });
+  }, 200);
+});
+glslCanvas.addEventListener('touchend', (e) => {
+  if (longPressTimeout) {
+    clearTimeout(longPressTimeout);
+    longPressTimeout = null;
+  }
+});
+glslCanvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (longPressTimeout) {
+    clearTimeout(longPressTimeout);
+    longPressTimeout = null;
+  }
+  const touchX = e.touches[0].clientX;
+  const touchY = e.touches[0].clientY;
+  cameraPos[0] -= (touchY - lastTouchY)*0.01;
+  cameraPos[2] += (touchX - lastTouchX)*0.01;
+  lastTouchX = touchX;
+  lastTouchY = touchY;
 });
 glslCanvas.addEventListener('contextmenu', function(e) {
     e.preventDefault();
@@ -153,7 +188,7 @@ function normalizePipes(s) {
   }
 }
 const gl = glslCanvas.getContext('webgl2');
-const R = 15;
+const R = 16;
 const W = R * 4;
 const H = R * 4;
 const TYPE_MAX = 20;
